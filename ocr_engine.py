@@ -1,7 +1,6 @@
 """
 ocr_engine.py
-Thin wrapper around PaddleOCR. Loads the model once (slow) and reuses it
-for every call (fast).
+# Load the OCR model once and reuse it for multiple images
 """
 
 from paddleocr import PaddleOCR
