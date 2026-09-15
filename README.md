@@ -1,75 +1,124 @@
-# EcoTrack AI — OCR & Bill Processing Module 
+# EcoTrack AI
 
-Turns a photo of a bill/receipt into structured item data:
-`[{"name": "Milk", "quantity": "2L x2", "price": 120.0, "confidence": 0.92}, ...]`
+EcoTrack AI is a project that helps estimate the carbon footprint of everyday purchases. The idea is to take a bill or receipt, identify the products in it, and use that information for further carbon-footprint calculation.
 
-## Setup
+## OCR & Bill Processing
 
-```bash
-pip install -r requirements.txt --break-system-packages
-```
+This repository contains the OCR part of the project.
 
-First run will download PaddleOCR model weights (needs internet, ~a few hundred MB).
+The module takes a photo of a bill/receipt and extracts the product details from it. The extracted information is then structured so that it can be used by the other parts of EcoTrack AI.
+
+For example, a bill like:
+
+    Milk 2L x2    120.00
+
+can be converted into:
+
+    {
+        "name": "Milk",
+        "quantity": "x2",
+        "price": 120.0,
+        "confidence": 0.92
+    }
+
+## How it works
+
+The basic flow is:
+
+    Bill Image
+        ↓
+    Image Preprocessing
+        ↓
+    OCR
+        ↓
+    Text Extraction
+        ↓
+    Product Details
+
+The product details can then be passed to the next stage of the project for carbon-footprint calculation.
 
 ## Files
 
-| File | Purpose |
-|---|---|
-| `preprocess.py` | Cleans raw bill photos (grayscale, denoise, threshold, deskew) |
-| `ocr_engine.py` | Wraps PaddleOCR — loads model once, returns text + confidence per line |
-| `extractor.py` | Parses raw OCR text into structured name/quantity/price |
-| `main.py` | Ties the above into one function: `process_bill(image_path)` |
-| `api.py` | FastAPI HTTP wrapper so other modules can call this over the network |
+- `preprocess.py` - prepares the bill image before OCR
+- `ocr_engine.py` - runs PaddleOCR and gets the text from the image
+- `extractor.py` - extracts product name, quantity and price from the OCR text
+- `main.py` - combines the different steps and processes a bill
+- `api.py` - provides an API for sending bill images to the module
+- `requirements.txt` - contains the required Python packages
+- `sample_bill.jpeg` - sample image used for testing
 
-## Usage — as a Python function (for teammates importing directly)
+## Setup
 
-```python
-from main import process_bill
+Clone the repository and open the project folder.
 
-result = process_bill("path/to/bill.jpg")
-print(result)
-# {"items": [...], "item_count": 5, "source_image": "bill.jpg"}
-```
+Install the required packages:
 
-## Usage — as an API (for the frontend / other services)
+    pip install -r requirements.txt
 
-```bash
-uvicorn api:app --reload --port 8001
-```
+PaddleOCR may download its model files the first time it is run, so an internet connection is required during the initial setup.
 
-Then POST an image file to `http://localhost:8001/process-bill` (multipart/form-data, field name `file`).
+## Running the OCR
 
-Response:
-```json
-{
-  "items": [
-    {"raw_text": "Milk 2L x2 120.00", "name": "Milk", "quantity": "x2", "price": 120.0, "confidence": 0.92}
-  ],
-  "item_count": 1,
-  "source_image": "bill.jpg"
-}
-```
+The module can be used directly from Python:
 
-## Output contract (share this with Member 2 — AI Product Understanding)
+    from main import process_bill
 
-Each item has:
-- `name` (string, raw extracted product name — may need further cleaning downstream)
-- `quantity` (string, not yet normalized to a strict unit)
-- `price` (float or null)
-- `confidence` (float 0-1, from OCR)
-- `raw_text` (original OCR line, for debugging)
+    result = process_bill("sample_bill.jpeg")
+    print(result)
 
-## Known limitations (be upfront about these with the team)
+The output contains the extracted items along with their quantity, price and OCR confidence.
 
-- `extractor.py`'s regex parsing is a first pass — real receipts vary wildly in layout and **will** break it. Expect to keep tuning this against real test bills.
-- Low-confidence OCR lines (below 0.6 threshold) are silently skipped, not shown to the user yet. Decide with Member 5 whether to expose a "some items couldn't be read" message.
-- Quantity strings aren't normalized (e.g. "2L", "x2", "1kg" are all different formats) — Member 4 (Carbon Calculation) will need to handle or request normalization.
-- No retry/fallback if PaddleOCR fails entirely on a bad image.
+## Running the API
 
-## Testing checklist (Weeks 3-4)
+To run the API locally:
 
-- [ ] Test on receipts from at least 3 different stores/formats
-- [ ] Test on blurry / low-light photos
-- [ ] Test on a folded/creased receipt
-- [ ] Confirm output JSON matches what Member 2 expects
-- [ ] Time how long `process_bill()` takes per image (flag if too slow for demo)
+    uvicorn api:app --reload --port 8001
+
+Once the server starts, bill images can be sent to:
+
+    POST /process-bill
+
+The image should be sent using the form field `file`.
+
+## Output
+
+Each detected item can contain:
+
+- `name` - product name found on the bill
+- `quantity` - quantity as read from the bill
+- `price` - price of the item
+- `confidence` - OCR confidence score
+- `raw_text` - original line detected by OCR
+
+Example:
+
+    {
+        "items": [
+            {
+                "name": "Milk",
+                "quantity": "x2",
+                "price": 120.0,
+                "confidence": 0.92
+            }
+        ],
+        "item_count": 1,
+        "source_image": "sample_bill.jpeg"
+    }
+
+## Testing
+
+The OCR module is being tested with different types of bills and images, including:
+
+- bills from different stores
+- blurry images
+- low-light images
+- different product and quantity formats
+- folded or slightly damaged receipts
+
+Testing with more real bills will help improve the extraction accuracy.
+
+## Part of EcoTrack AI
+
+This OCR module is the first step in the overall EcoTrack AI pipeline. Its job is to convert the information on a physical bill into structured data that can be used by the other modules of the project.
+
+More features and improvements will be added as the project develops.
